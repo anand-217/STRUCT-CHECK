@@ -1,0 +1,16 @@
+name: Build StructCheck.exe
+on: [workflow_dispatch, push]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: |
+          cd backend
+          python -m pip install -r requirements.txt pyinstaller
+          python -m pytest -q
+          pyinstaller --noconfirm --onefile --windowed --name StructCheck --collect-submodules ezdxf --collect-submodules openpyxl structcheck_app.py
+      - uses: actions/upload-artifact@v4
+        with: { name: StructCheck-windows, path: backend/dist/StructCheck.exe }
