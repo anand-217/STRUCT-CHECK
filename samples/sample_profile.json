@@ -1,0 +1,182 @@
+{
+  "name": "Sample project",
+  "drawing_unit": "auto",
+  "beam_id_regex": "(?:B|BM|FB|PB|SB)[- ]?\\d+[A-Za-z]?",
+  "slab_id_regex": "S[- ]?\\d+[A-Za-z]?",
+  "column_id_regex": "(?:C|COL|K)[- ]?\\d+[A-Za-z]?",
+  "hyphen_equivalent": false,
+  "leading_zero_equivalent": false,
+  "beam_columns": {
+    "id": [
+      "BEAM NO",
+      "BEAM NO.",
+      "BEAM MARK",
+      "BEAM",
+      "BM NO",
+      "MARK",
+      "B NO"
+    ],
+    "width": [
+      "WIDTH",
+      "B (MM)",
+      "B(MM)",
+      "BREADTH"
+    ],
+    "depth": [
+      "OVERALL DEPTH",
+      "DEPTH",
+      "D (MM)",
+      "D(MM)",
+      "OD"
+    ],
+    "top": [
+      "TOP",
+      "TOP STEEL",
+      "TOP REINFORCEMENT",
+      "TOP BARS"
+    ],
+    "bottom": [
+      "BOTTOM",
+      "BOTTOM STEEL",
+      "BOT",
+      "BOTTOM BARS",
+      "BOTTOM REINFORCEMENT"
+    ],
+    "stirrups": [
+      "STIRRUPS",
+      "STIRRUP",
+      "SHEAR",
+      "LINKS",
+      "SHEAR REINFORCEMENT"
+    ]
+  },
+  "slab_columns": {
+    "id": [
+      "SLAB NO",
+      "SLAB NO.",
+      "SLAB MARK",
+      "SLAB",
+      "MARK"
+    ],
+    "thickness": [
+      "THICKNESS",
+      "THK",
+      "SLAB THICKNESS",
+      "DEPTH"
+    ],
+    "bottom_main": [
+      "MAIN",
+      "MAIN STEEL",
+      "SHORT SPAN",
+      "BOTTOM MAIN"
+    ],
+    "bottom_dist": [
+      "DIST",
+      "DISTRIBUTION",
+      "LONG SPAN",
+      "DIST STEEL",
+      "BOTTOM DIST"
+    ],
+    "top": [
+      "TOP",
+      "TOP STEEL"
+    ]
+  },
+  "column_columns": {
+    "id": [
+      "COLUMN NO",
+      "COLUMN NO.",
+      "COL NO",
+      "COLUMN MARK",
+      "COLUMN",
+      "COL",
+      "MARK"
+    ],
+    "size": [
+      "SIZE",
+      "DIMENSION",
+      "B X D",
+      "SECTION"
+    ],
+    "main": [
+      "MAIN",
+      "MAIN STEEL",
+      "VERTICAL",
+      "REINFORCEMENT",
+      "MAIN BARS",
+      "LONGITUDINAL"
+    ],
+    "ties": [
+      "TIES",
+      "STIRRUPS",
+      "LINKS",
+      "LATERAL TIES"
+    ]
+  },
+  "beam_required_fields": [
+    "id",
+    "width",
+    "depth",
+    "top",
+    "bottom",
+    "stirrups"
+  ],
+  "slab_required_fields": [
+    "id",
+    "thickness",
+    "bottom_main",
+    "bottom_dist"
+  ],
+  "column_required_fields": [
+    "id",
+    "size",
+    "main",
+    "ties"
+  ],
+  "schedule_regions": [],
+  "schedule_row_tol_factor": 0.7,
+  "beam_layers": [],
+  "excluded_layers": [],
+  "beam_width_tolerance_mm": 5.0,
+  "beam_min_width_mm": 75.0,
+  "beam_max_width_mm": 1200.0,
+  "beam_min_length_mm": 800.0,
+  "label_search_radius_mm": 600.0,
+  "panel_layers": [],
+  "min_panel_area_m2": 1.5,
+  "max_panel_area_m2": 150.0,
+  "allow_multiple_slab_labels": false,
+  "title_abbreviations": {
+    "GF": "GROUND",
+    "G.F.": "GROUND",
+    "FF": "FIRST",
+    "SF": "SECOND",
+    "TF": "THIRD"
+  },
+  "single_floor_per_drawing": true,
+  "column_id_mode": "unique",
+  "column_schedule_check": true,
+  "column_label_conflict_dist_mm": 300.0,
+  "column_max_dim_mm": 1500.0,
+  "text_categories_standard": {},
+  "text_height_tolerance_pct": 1.0,
+  "text_min_dominance": 0.6,
+  "text_likely_dominance": 0.8,
+  "text_min_group_size": 3,
+  "exclude_text_layers": [],
+  "exclude_text_styles": [],
+  "exclude_text_blocks": [],
+  "exclude_text_patterns": [],
+  "exclude_entity_types": [],
+  "exclude_text_handles": [],
+  "exclude_regions": [],
+  "include_notes_check": false,
+  "plot_scale": null,
+  "min_plotted_text_mm": 1.8,
+  "default_report_formats": [
+    "json",
+    "csv",
+    "xlsx"
+  ],
+  "keep_temp_files": false
+}
