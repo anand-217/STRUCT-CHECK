@@ -77,7 +77,7 @@ def test_r3_plan_beam_not_in_schedule(tmp_path):
     assert has(run(tmp_path, ["b6_not_in_sched"]), 3, "A not in schedule", "B6", Severity.ERROR)
 
 def test_r3_missing_design_data(tmp_path):
-    res = run(tmp_path, ["b10_incomplete"])
+    res = run(tmp_path, ["b10_incomplete"], prof(beam_required_fields=["id", "width", "depth", "top", "bottom", "stirrups"]))
     assert has(res, 3, "B dimensions", "depth") and has(res, 3, "C reinforcement", "stirrups")
 
 def test_r3_format_difference_is_review_not_merged(tmp_path):

@@ -52,3 +52,7 @@ To get a standalone **StructCheck.exe**: on any Windows PC with Python, double-c
 (result: `backend\dist\StructCheck.exe`). Copy that single file anywhere; Python is not needed to run it.
 Alternative without installing Python: push this folder to a GitHub repo and run the "Build StructCheck.exe"
 workflow (Actions tab); download the exe from the run's artifacts. The .exe has not been built or run on Windows by me.
+
+## Update (v0.2): real-drawing format
+Reads multi-line schedule headers, multi-beam rows ("2, 8, 19."), numeric tags on layers like `BEAM NO` / `COL-NO`,
+span-by-span MLINE beams, `%%U` codes. See `docs/LAYERS_AND_FORMAT.md`. 47 tests (incl. `tests/test_real_format.py`).

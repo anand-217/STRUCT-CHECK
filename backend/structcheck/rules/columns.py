@@ -28,7 +28,7 @@ def _column_geoms(ctx):
 def run(ctx) -> RuleResult:
     R = RuleResult(7, "Duplicate / conflicting column numbers")
     p = ctx.p
-    labels = ctx.labels(p.column_id_regex)
+    labels = ctx.column_labels()
     scheds = ctx.sched("column")
     mode = p.column_id_mode
     if not labels and not scheds:
@@ -148,15 +148,29 @@ def run(ctx) -> RuleResult:
             confidence=0.95, reason="Schedule identifiers are expected to be unique",
             recommended_action="Remove the duplicate or give the different column its own number."))
     if p.column_schedule_check:
+        import difflib
+        def prefix(i):
+            m = re.match(r"[A-Za-z]*", strict_key(i)); return m.group(0)
+        sched_prefixes = {prefix(r.cells["id"]) for lst in rows.values() for _, r in lst}
         plan_keys = {match_key(l.text, p) for l in labels}
         grouped = defaultdict(list)
         for l in labels:
             grouped[match_key(l.text, p)].append(l)
+        skipped = sorted({prefix(l.text) or "(numbers only)" for l in labels if prefix(l.text) not in sched_prefixes})
+        if skipped:
+            R.notes.append("Plan labels of type(s) " + ", ".join(skipped) + " were not compared with the column schedule because the schedule only lists "
+                           + ", ".join(sorted(x or "(numbers only)" for x in sched_prefixes)) + " columns.")
+        sched_ids = [r.cells["id"] for lst in rows.values() for _, r in lst]
+        plan_ids = sorted({l.text for l in labels})
         for k, labs in grouped.items():               # G
+            if prefix(labs[0].text) not in sched_prefixes:
+                continue
             if k not in rows and not any(loose_key(labs[0].text) == loose_key(r.cells["id"]) for lst in rows.values() for _, r in lst):
+                near = difflib.get_close_matches(labs[0].text, [i for i in sched_ids if strict_key(i) not in plan_keys], n=1, cutoff=0.7)
                 R.findings.append(ctx.finding(
                     rule=7, category="Column numbers", severity=Severity.WARNING, sub_check="G layout not in schedule",
                     description=f"Column {labs[0].text} appears in the layout but not in the column schedule",
+                    explanation="Possible typo: the schedule has " + near[0] + " which is not in the plan." if near else "",
                     identifier=labs[0].text, layout=labs[0].layout, entity_handles=[l.handle for l in labs],
                     bbox=union_bbox([l.bbox for l in labs]), confidence=0.8, reason="No schedule row for this label",
                     recommended_action="Add to schedule or correct label."))
@@ -164,9 +178,11 @@ def run(ctx) -> RuleResult:
         for k, lst in rows.items():                   # H
             s, r = lst[0]
             if k not in plan_keys and loose_key(r.cells["id"]) not in loose_plan:
+                near = difflib.get_close_matches(r.cells["id"], [l for l in plan_ids if match_key(l, p) not in rows], n=1, cutoff=0.7)
                 R.findings.append(ctx.finding(
                     rule=7, category="Column numbers", severity=Severity.WARNING, sub_check="H schedule not in layout",
                     description=f"Scheduled column {r.cells['id']} not found in the column layout",
+                    explanation="Possible typo: the plan has " + near[0] + " which is not in the schedule." if near else "",
                     identifier=r.cells["id"], layout=s.layout, schedule_ref=f"row {r.index}", entity_handles=r.handles, bbox=r.bbox,
                     confidence=0.7, reason="No layout label for this schedule entry",
                     recommended_action="Confirm the column exists on this level."))

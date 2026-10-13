@@ -43,7 +43,7 @@ def run(ctx) -> RuleResult:
         for r in s.rows:
             if r.cells.get("id"):
                 rows[match_key(r.cells["id"], ctx.p)].append((s, r))
-    labels = ctx.labels(ctx.p.slab_id_regex)
+    labels = ctx.slab_labels()
     by_key = defaultdict(list)
     for l in labels:
         by_key[match_key(l.text, ctx.p)].append(l)
@@ -54,10 +54,12 @@ def run(ctx) -> RuleResult:
         if k in by_key:
             continue
         loose_hit = any(loose_key(l.text) == loose_key(r.cells["id"]) for l in labels)
+        ment = ctx.mentions(r.cells["id"])
         R.findings.append(ctx.finding(
-            rule=4, category="Slab numbers", severity=Severity.REVIEW if loose_hit else Severity.WARNING, sub_check="A schedule not in plan",
+            rule=4, category="Slab numbers", severity=Severity.REVIEW if (loose_hit or ment) else Severity.WARNING, sub_check="A schedule not in plan",
             description=f"Scheduled slab {r.cells['id']} not found in the slab plan",
-            explanation="Slab type present in schedule with no matching plan label." + (" A differently-formatted label exists." if loose_hit else ""),
+            explanation="Slab type present in schedule with no matching plan label." + (" A differently-formatted label exists." if loose_hit else "")
+                        + (f" It IS mentioned elsewhere in the drawing ('{ment.text}' on layer {ment.layer}) - possibly a stair/detail slab not labelled in the plan." if ment else ""),
             expected=r.cells["id"], detected="not found", identifier=r.cells["id"], layout=s.layout,
             schedule_ref=f"slab schedule row {r.index}", entity_handles=r.handles, bbox=r.bbox,
             confidence=0.5 if loose_hit else (0.75 if labels else 0.5), reason="No plan annotation for this schedule entry",

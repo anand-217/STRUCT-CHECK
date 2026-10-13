@@ -48,16 +48,17 @@ def classify(ctx, t):
     if ctx.in_schedule(t):
         for s in ctx.schedules:
             if s.layout == t.layout and in_bbox((t.x, t.y), s.bbox):
-                hdr_y = max(r.y for r in s.rows)
-                part = "header" if t.y > hdr_y + 1e-6 else "body"
+                bnd = s.hdr_boundary if s.hdr_boundary is not None else max(r.y for r in s.rows) + 1e-6
+                part = "header" if t.y > bnd else "body"
                 return f"{s.type.capitalize()} schedule text ({part})", False, ""
     if t.kind == "DIMENSION": return "Dimensions", False, ""
-    if re.fullmatch(p.beam_id_regex, first, re.I): return "Beam numbers", False, ""
-    if re.fullmatch(p.slab_id_regex, first, re.I): return "Slab numbers", False, ""
-    if re.fullmatch(p.column_id_regex, first, re.I): return "Column numbers", False, ""
+    on = lambda pats: any(re.search(x, t.layer, re.I) for x in pats)
+    if on(p.beam_label_layers) or re.fullmatch(p.beam_id_regex, first, re.I): return "Beam numbers", False, ""
+    if on(p.slab_label_layers) or re.fullmatch(p.slab_id_regex, first, re.I): return "Slab numbers", False, ""
+    if on(p.column_label_layers) or re.fullmatch(p.column_id_regex, first, re.I): return "Column numbers", False, ""
     if re.search(r"GRID", t.layer, re.I) and len(first) <= 3: return "Grid labels", False, ""
     if REBAR.search(first): return "Reinforcement annotations", False, ""
-    return "General structural annotations", False, ""
+    return f"General annotations (layer {t.layer})", False, ""
 
 
 def run(ctx) -> RuleResult:

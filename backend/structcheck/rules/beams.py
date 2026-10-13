@@ -115,8 +115,56 @@ def beam_geometry(ctx):
                 m1 = ((pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2)
                 m2 = ((pts[2][0] + pts[3][0]) / 2, (pts[2][1] + pts[3][1]) / 2)
             geos.append(BeamGeo([pl.handle], lay, [(m1, m2)], short, "RECT-POLYLINE", pl.layer, heuristic))
+    geos = _chain(ctx, geos)
     ctx._beam_geo = geos
     return geos
+
+
+def _chain(ctx, geos):
+    """Join collinear beam pieces separated by a small gap (the column between two spans) into ONE beam run, so a
+    continuous beam that is drawn span-by-span needs only one label."""
+    gap, tol, wtol = ctx.du(ctx.p.beam_chain_gap_mm), ctx.du(5), ctx.du(1)
+    n = len(geos)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]; i = parent[i]
+        return i
+
+    def joinable(g, h):
+        for a, b in g.segs:
+            la = math.dist(a, b)
+            if la == 0:
+                continue
+            ux, uy = (b[0] - a[0]) / la, (b[1] - a[1]) / la
+            for c, d in h.segs:
+                lc = math.dist(c, d)
+                if lc == 0:
+                    continue
+                if abs(ux * (d[1] - c[1]) / lc - uy * (d[0] - c[0]) / lc) > 0.0175:      # sin(1 deg)
+                    continue
+                if abs((c[0] - a[0]) * (-uy) + (c[1] - a[1]) * ux) > tol:
+                    continue
+                ta = sorted(((q[0] - a[0]) * ux + (q[1] - a[1]) * uy) for q in (a, b))
+                tb = sorted(((q[0] - a[0]) * ux + (q[1] - a[1]) * uy) for q in (c, d))
+                if max(ta[0], tb[0]) - min(ta[1], tb[1]) <= gap:
+                    return True
+        return False
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            gi, gj = geos[i], geos[j]
+            if gi.layout == gj.layout and gi.kind == gj.kind and abs(gi.width_du - gj.width_du) <= wtol and joinable(gi, gj):
+                parent[find(i)] = find(j)
+    merged = {}
+    for i, g in enumerate(geos):
+        r = find(i)
+        if r not in merged:
+            merged[r] = BeamGeo(list(g.handles), g.layout, list(g.segs), g.width_du, g.kind, g.layer, g.layers_heuristic, g.note)
+        else:
+            m = merged[r]; m.handles += g.handles; m.segs += g.segs
+    return list(merged.values())
 
 
 def associate(ctx):
@@ -125,7 +173,7 @@ def associate(ctx):
     if cached is not None:
         return cached
     geos = beam_geometry(ctx)
-    labels = ctx.labels(ctx.p.beam_id_regex)
+    labels = ctx.beam_labels()
     radius = ctx.du(ctx.p.label_search_radius_mm)
     assoc, unassoc, ambiguous = [], [], []
     for lab in labels:
@@ -175,7 +223,7 @@ def run_rule1(ctx) -> RuleResult:
                                           "No beam schedule header (id column plus at least two design columns) was recognised."))
         return R
     rows = _rows_by_key(ctx)
-    labels = ctx.labels(ctx.p.beam_id_regex)
+    labels = ctx.beam_labels()
     geos = beam_geometry(ctx)
     assoc, unassoc, ambiguous = associate(ctx)
     present = {match_key(l.text, ctx.p) for l in labels}
@@ -205,8 +253,15 @@ def run_rule1(ctx) -> RuleResult:
                                           "No beam geometry could be recognised, so missing labels on individual beams cannot be detected.",
                                           "Set beam layers in the profile or check unsupported entities."))
     labelled = {id(g) for _, g in assoc} | {id(g) for _, gs in ambiguous for g in gs}
+    # only beams inside the beam-plan region (bbox of all beam labels + margin) are expected to carry a label;
+    # line work in sections/details elsewhere on the sheet is ignored
+    lb = union_bbox([l.bbox for l in labels]) if labels else None
+    m = ctx.du(ctx.p.plan_margin_mm)
     for g in geos:
         if id(g) in labelled:
+            continue
+        cx, cy = (g.bbox[0] + g.bbox[2]) / 2, (g.bbox[1] + g.bbox[3]) / 2
+        if lb and not (lb[0] - m <= cx <= lb[2] + m and lb[1] - m <= cy <= lb[3] + m):
             continue
         L = sum(math.dist(a, b) for a, b in g.segs)
         short = ctx.mm(L) < 2000
@@ -320,7 +375,7 @@ def run_rule3(ctx) -> RuleResult:
                 loose_rows[loose_key(r.cells["id"])].append((s, r))
     # A / E / F : plan label vs schedule
     seen = defaultdict(list)
-    for lab in ctx.labels(ctx.p.beam_id_regex):
+    for lab in ctx.beam_labels():
         seen[strict_key(lab.text)].append(lab)
     for key, labs in seen.items():
         mk = match_key(labs[0].text, ctx.p)

@@ -1,5 +1,5 @@
 {
-  "name": "Sample project",
+  "name": "Default - labels on BEAM NO / SLAB / COL-NO layers",
   "drawing_unit": "auto",
   "beam_id_regex": "(?:B|BM|FB|PB|SB)[- ]?\\d+[A-Za-z]?",
   "slab_id_regex": "S[- ]?\\d+[A-Za-z]?",
@@ -8,84 +8,85 @@
   "leading_zero_equivalent": false,
   "beam_columns": {
     "id": [
+      "BEAM NUMBERS",
+      "BEAM NOS",
       "BEAM NO",
-      "BEAM NO.",
       "BEAM MARK",
       "BEAM",
       "BM NO",
-      "MARK",
-      "B NO"
+      "MARK"
+    ],
+    "size": [
+      "SIZE",
+      "B X D"
     ],
     "width": [
       "WIDTH",
-      "B (MM)",
-      "B(MM)",
       "BREADTH"
     ],
     "depth": [
-      "OVERALL DEPTH",
       "DEPTH",
-      "D (MM)",
-      "D(MM)",
-      "OD"
+      "OVERALL DEPTH"
     ],
-    "top": [
-      "TOP",
-      "TOP STEEL",
-      "TOP REINFORCEMENT",
-      "TOP BARS"
+    "bottom_curtailed": [
+      "CURTAILED"
+    ],
+    "top_anchor": [
+      "ANCHOR"
+    ],
+    "top_left": [
+      "LEFT"
+    ],
+    "top_right": [
+      "RIGHT"
     ],
     "bottom": [
       "BOTTOM",
-      "BOTTOM STEEL",
-      "BOT",
-      "BOTTOM BARS",
-      "BOTTOM REINFORCEMENT"
+      "STRAIGHT"
+    ],
+    "top": [
+      "TOP"
     ],
     "stirrups": [
       "STIRRUPS",
       "STIRRUP",
       "SHEAR",
-      "LINKS",
-      "SHEAR REINFORCEMENT"
+      "LINKS"
     ]
   },
   "slab_columns": {
     "id": [
+      "SLAB NOS",
       "SLAB NO",
-      "SLAB NO.",
       "SLAB MARK",
       "SLAB",
       "MARK"
     ],
     "thickness": [
-      "THICKNESS",
       "THK",
-      "SLAB THICKNESS",
+      "THICKNESS",
       "DEPTH"
+    ],
+    "bottom_dist": [
+      "DISTRIBUTION",
+      "DIST"
     ],
     "bottom_main": [
       "MAIN",
-      "MAIN STEEL",
-      "SHORT SPAN",
-      "BOTTOM MAIN"
-    ],
-    "bottom_dist": [
-      "DIST",
-      "DISTRIBUTION",
-      "LONG SPAN",
-      "DIST STEEL",
-      "BOTTOM DIST"
+      "SHORT SPAN"
     ],
     "top": [
-      "TOP",
-      "TOP STEEL"
+      "TOP"
+    ],
+    "remarks": [
+      "REMARKS",
+      "REMARK"
     ]
   },
   "column_columns": {
     "id": [
+      "COLUMN NOS",
       "COLUMN NO",
-      "COLUMN NO.",
       "COL NO",
       "COLUMN MARK",
       "COLUMN",
@@ -100,26 +101,22 @@
     ],
     "main": [
       "MAIN",
-      "MAIN STEEL",
       "VERTICAL",
       "REINFORCEMENT",
-      "MAIN BARS",
       "LONGITUDINAL"
     ],
     "ties": [
       "TIES",
       "STIRRUPS",
       "LINKS",
-      "LATERAL TIES"
+      "LATERAL"
     ]
   },
   "beam_required_fields": [
     "id",
     "width",
     "depth",
-    "top",
-    "bottom",
-    "stirrups"
+    "bottom"
   ],
   "slab_required_fields": [
     "id",
@@ -129,10 +126,22 @@
   ],
   "column_required_fields": [
     "id",
-    "size",
-    "main",
-    "ties"
+    "size"
   ],
+  "beam_label_layers": [
+    "BEAM[ _-]?(NO|NUM|TXT|TEXT|MARK|TAG)",
+    "^BM[ _-]?(NO|TXT)"
+  ],
+  "slab_label_layers": [
+    "^SLAB([ _-]?(NO|NUM|TXT|TEXT|MARK|TAG))?$"
+  ],
+  "column_label_layers": [
+    "COL(UMN)?[ _-]?(NO|NUM|TXT|TEXT|MARK|TAG)"
+  ],
+  "schedule_max_gap_mm": 3500.0,
+  "schedule_max_row_gap_factor": 4.0,
+  "plan_margin_mm": 4000.0,
+  "beam_chain_gap_mm": 1500.0,
   "schedule_regions": [],
   "schedule_row_tol_factor": 0.7,
   "beam_layers": [],
@@ -154,12 +163,12 @@
     "TF": "THIRD"
   },
   "single_floor_per_drawing": true,
-  "column_id_mode": "unique",
+  "column_id_mode": "unknown",
   "column_schedule_check": true,
   "column_label_conflict_dist_mm": 300.0,
   "column_max_dim_mm": 1500.0,
   "text_categories_standard": {},
-  "text_height_tolerance_pct": 1.0,
+  "text_height_tolerance_pct": 3.0,
   "text_min_dominance": 0.6,
   "text_likely_dominance": 0.8,
   "text_min_group_size": 3,

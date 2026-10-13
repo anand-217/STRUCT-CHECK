@@ -24,3 +24,10 @@ def is_blank(v) -> bool:
 def first_number(s):
     m = re.search(r"\d+(?:\.\d+)?", s or "")
     return float(m.group()) if m else None
+
+
+def clean_label(s: str) -> str:
+    """'8/' -> '8', '12C.' -> '12C', 'S 1.' -> 'S1' (stray punctuation / spaces after a single letter prefix)."""
+    t = re.sub(r"%%[A-Za-z]", "", s or "").strip().strip("./,;:")
+    t = re.sub(r"^([A-Za-z]{1,3}) (?=\d)", r"\1", t)
+    return t.strip()

@@ -43,11 +43,25 @@ class TextItem:
     height_certain: bool = True
     height_note: str = ""
     nlines: int = 1
+    halign: int = 0          # 0 left, 1 centre, 2 right (TEXT); others treated as left
+
+    @property
+    def width(self):
+        return max(1, len(self.text.split("\n")[0])) * self.eff_height * 0.7
+
+    @property
+    def left(self):
+        w = self.width
+        return self.x - w / 2 if self.halign in (1, 4) else self.x - w if self.halign == 2 else self.x
+
+    @property
+    def cx(self):
+        return self.left + self.width / 2
 
     @property
     def bbox(self):
-        w = max(1, len(self.text.split("\n")[0])) * self.eff_height * 0.75
-        return (self.x, self.y, self.x + w, self.y + self.eff_height * max(1, self.nlines))
+        w = self.width
+        return (self.left, self.y, self.left + w, self.y + self.eff_height * max(1, self.nlines))
 
 
 @dataclass
@@ -101,6 +115,17 @@ class Drawing:
                 "limitations": self.limitations, "dxf_version": self.dxf_version}
 
 
+_CODES = [(re.compile(r"%%[uUoO]"), ""), (re.compile(r"%%[dD]"), "\u00b0"), (re.compile(r"%%[pP]"), "\u00b1"),
+          (re.compile(r"%%[cC]"), "\u00d8")]
+
+
+def clean_text(t: str) -> str:
+    """Strip AutoCAD control codes (%%U underline, %%O overline, %%D degree, %%P plus-minus, %%C diameter)."""
+    for rx, rep in _CODES:
+        t = rx.sub(rep, t or "")
+    return t
+
+
 _H_OVERRIDE = re.compile(r"\\H(\d+(?:\.\d+)?)(x?);")
 
 
@@ -141,7 +166,7 @@ class _Loader:
         style = e.dxf.get("style", "Standard")
         note, certain = "", True
         if t in ("TEXT", "ATTRIB", "ATTDEF"):
-            txt = e.dxf.get("text", "") or ""
+            txt = clean_text(e.dxf.get("text", "") or "")
             h = float(e.dxf.get("height", 0) or 0)
             if h == 0:
                 h = self._style_height(style)
@@ -154,7 +179,7 @@ class _Loader:
             rot = e.dxf.get("rotation", 0)
             nl = 1
         elif t == "MTEXT":
-            txt = e.plain_text()
+            txt = clean_text(e.plain_text())
             base, eff, certain, note = _mtext_height(e)
             raw = raw_hint if raw_hint else base
             pt = e.dxf.insert
@@ -169,7 +194,8 @@ class _Loader:
         it = TextItem(handle=top_handle or e.dxf.handle, kind=t, text=txt.strip(), x=float(pt[0]), y=float(pt[1]),
                       raw_height=float(raw), eff_height=float(eff), layer=e.dxf.get("layer", "0"), style=style,
                       layout=layout, is_model=is_model, rotation=float(rot or 0), block_path=tuple(block_path),
-                      top_handle=top_handle or "", height_certain=certain, height_note=note, nlines=nl)
+                      top_handle=top_handle or "", height_certain=certain, height_note=note, nlines=nl,
+                      halign=int(e.dxf.get("halign", 0) or 0) if t in ("TEXT", "ATTRIB", "ATTDEF") else 0)
         self.d.texts.append(it)
 
     def add_dimension(self, e, layout, is_model):
@@ -340,6 +366,8 @@ def load_drawing(path: str, profile: Optional[ProjectProfile] = None, workdir: O
         if lay.is_any_paperspace:
             for vp in lay.viewports():
                 try:
+                    if vp.dxf.get("id", 2) == 1 or not vp.dxf.height:
+                        continue                      # paper-space overview viewport, not a model view
                     if vp.dxf.height:
                         d.viewport_scales.append(round(vp.dxf.view_height / vp.dxf.height, 4))
                 except Exception:

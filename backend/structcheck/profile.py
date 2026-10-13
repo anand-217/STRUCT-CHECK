@@ -5,33 +5,41 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 
 
+# Column maps: field -> list of phrases. A header (all header lines of a column joined) matches a field when ALL
+# words of ANY phrase are present in it. Fields are tried in the order listed, first match wins.
 def _beam_cols():
     return {
-        "id": ["BEAM NO", "BEAM NO.", "BEAM MARK", "BEAM", "BM NO", "MARK", "B NO"],
-        "width": ["WIDTH", "B (MM)", "B(MM)", "BREADTH"],
-        "depth": ["OVERALL DEPTH", "DEPTH", "D (MM)", "D(MM)", "OD"],
-        "top": ["TOP", "TOP STEEL", "TOP REINFORCEMENT", "TOP BARS"],
-        "bottom": ["BOTTOM", "BOTTOM STEEL", "BOT", "BOTTOM BARS", "BOTTOM REINFORCEMENT"],
-        "stirrups": ["STIRRUPS", "STIRRUP", "SHEAR", "LINKS", "SHEAR REINFORCEMENT"],
+        "id": ["BEAM NUMBERS", "BEAM NOS", "BEAM NO", "BEAM MARK", "BEAM", "BM NO", "MARK"],
+        "size": ["SIZE", "B X D"],
+        "width": ["WIDTH", "BREADTH"],
+        "depth": ["DEPTH", "OVERALL DEPTH"],
+        "bottom_curtailed": ["CURTAILED"],
+        "top_anchor": ["ANCHOR"],
+        "top_left": ["LEFT"],
+        "top_right": ["RIGHT"],
+        "bottom": ["BOTTOM", "STRAIGHT"],
+        "top": ["TOP"],
+        "stirrups": ["STIRRUPS", "STIRRUP", "SHEAR", "LINKS"],
     }
 
 
 def _slab_cols():
     return {
-        "id": ["SLAB NO", "SLAB NO.", "SLAB MARK", "SLAB", "MARK"],
-        "thickness": ["THICKNESS", "THK", "SLAB THICKNESS", "DEPTH"],
-        "bottom_main": ["MAIN", "MAIN STEEL", "SHORT SPAN", "BOTTOM MAIN"],
-        "bottom_dist": ["DIST", "DISTRIBUTION", "LONG SPAN", "DIST STEEL", "BOTTOM DIST"],
-        "top": ["TOP", "TOP STEEL"],
+        "id": ["SLAB NOS", "SLAB NO", "SLAB MARK", "SLAB", "MARK"],
+        "thickness": ["THK", "THICKNESS", "DEPTH"],
+        "bottom_dist": ["DISTRIBUTION", "DIST"],
+        "bottom_main": ["MAIN", "SHORT SPAN"],
+        "top": ["TOP"],
+        "remarks": ["REMARKS", "REMARK"],
     }
 
 
 def _col_cols():
     return {
-        "id": ["COLUMN NO", "COLUMN NO.", "COL NO", "COLUMN MARK", "COLUMN", "COL", "MARK"],
+        "id": ["COLUMN NOS", "COLUMN NO", "COL NO", "COLUMN MARK", "COLUMN", "COL", "MARK"],
         "size": ["SIZE", "DIMENSION", "B X D", "SECTION"],
-        "main": ["MAIN", "MAIN STEEL", "VERTICAL", "REINFORCEMENT", "MAIN BARS", "LONGITUDINAL"],
-        "ties": ["TIES", "STIRRUPS", "LINKS", "LATERAL TIES"],
+        "main": ["MAIN", "VERTICAL", "REINFORCEMENT", "LONGITUDINAL"],
+        "ties": ["TIES", "STIRRUPS", "LINKS", "LATERAL"],
     }
 
 
@@ -50,9 +58,18 @@ class ProjectProfile:
     beam_columns: dict = field(default_factory=_beam_cols)
     slab_columns: dict = field(default_factory=_slab_cols)
     column_columns: dict = field(default_factory=_col_cols)
-    beam_required_fields: list = field(default_factory=lambda: ["id", "width", "depth", "top", "bottom", "stirrups"])
+    beam_required_fields: list = field(default_factory=lambda: ["id", "width", "depth", "bottom"])
     slab_required_fields: list = field(default_factory=lambda: ["id", "thickness", "bottom_main", "bottom_dist"])
-    column_required_fields: list = field(default_factory=lambda: ["id", "size", "main", "ties"])
+    column_required_fields: list = field(default_factory=lambda: ["id", "size"])
+    # Layers that carry the label text. Patterns are regex (case-insensitive). When a layer matches, EVERY text on it
+    # is a label (so numeric tags like "12" or "12C" work); otherwise the id regex above is used on all plan text.
+    beam_label_layers: list = field(default_factory=lambda: [r"BEAM[ _-]?(NO|NUM|TXT|TEXT|MARK|TAG)", r"^BM[ _-]?(NO|TXT)"])
+    slab_label_layers: list = field(default_factory=lambda: [r"^SLAB([ _-]?(NO|NUM|TXT|TEXT|MARK|TAG))?$"])
+    column_label_layers: list = field(default_factory=lambda: [r"COL(UMN)?[ _-]?(NO|NUM|TXT|TEXT|MARK|TAG)"])
+    schedule_max_gap_mm: float = 3500.0       # horizontal gap that ends a schedule
+    schedule_max_row_gap_factor: float = 4.0  # vertical gap (x typical row pitch) that ends a schedule
+    plan_margin_mm: float = 4000.0            # beams farther than this from every beam label are treated as details, not plan
+    beam_chain_gap_mm: float = 1500.0         # collinear MLINE pieces closer than this form one beam run (columns between spans)
     schedule_regions: list = field(default_factory=list)   # [{"type":"beam","layout":"Model","bbox":[x0,y0,x1,y1]}]
     schedule_row_tol_factor: float = 0.7
     # --- Rule 1/2 beams ---
@@ -78,7 +95,7 @@ class ProjectProfile:
     column_max_dim_mm: float = 1500.0
     # --- Rule 8 text height ---
     text_categories_standard: dict = field(default_factory=dict)   # {"Beam numbers": 150.0} effective drawing units
-    text_height_tolerance_pct: float = 1.0
+    text_height_tolerance_pct: float = 3.0
     text_min_dominance: float = 0.6
     text_likely_dominance: float = 0.8
     text_min_group_size: int = 3

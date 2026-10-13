@@ -10,7 +10,7 @@ ORD = {"FIRST": 1, "SECOND": 2, "THIRD": 3, "FOURTH": 4, "FIFTH": 5, "SIXTH": 6,
        "NINTH": 9, "TENTH": 10}
 NAMED = {"GROUND": "G", "PLINTH": "PLINTH", "STILT": "STILT", "PODIUM": "PODIUM", "TERRACE": "TERRACE", "ROOF": "ROOF",
          "FOUNDATION": "FOUNDATION", "BASEMENT": "BASEMENT"}
-TITLE_WORDS = re.compile(r"\b(SCHEDULE|LAYOUT|DETAILS?|PLAN|FLOOR|SLAB LEVEL|LEVEL)\b")
+TITLE_WORDS = re.compile(r"\b(SCHEDULE|LAYOUT|DETAILS?|PLAN|RCC)\b")
 
 def parse_levels(text, abbr):
     t = " " + re.sub(r"[^A-Z0-9+ .]", " ", text.upper()) + " "
