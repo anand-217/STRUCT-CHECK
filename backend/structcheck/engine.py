@@ -37,7 +37,8 @@ class CheckResult:
                 "rules_skipped": sum(1 for r in self.rules if r["status"] == "SKIPPED")}
 
     def to_dict(self):
-        return {"disclaimer": DISCLAIMER, "drawing": self.drawing, "integrity": self.integrity, "summary": self.summary(),
+        from . import __version__
+        return {"structcheck_version": __version__, "disclaimer": DISCLAIMER, "drawing": self.drawing, "integrity": self.integrity, "summary": self.summary(),
                 "rules": self.rules, "findings": [f.to_dict() for f in self.findings],
                 "text_height_analysis": self.text_height_analysis, "schedules": self.schedules,
                 "profile": self.profile, "seconds": round(self.seconds, 2)}

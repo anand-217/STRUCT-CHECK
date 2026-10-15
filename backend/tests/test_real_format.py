@@ -121,3 +121,25 @@ def test_marked_pdf_written(tmp_path):
     d = str(tmp_path / "m.dxf"); review.mark_dxf(src, res.findings, d)
     pdf = str(tmp_path / "m.pdf"); n, _ = review.mark_pdf(d, res.findings, pdf, detail_pages=3)
     assert n >= 20 and open(pdf, "rb").read(4) == b"%PDF"
+
+
+def test_lisp_mode_outputs_marks_and_summary_last(tmp_path):
+    from structcheck.cli import safe_main
+    from sample_factory import build, ALL_ERRORS
+    src = str(tmp_path / "d.dxf"); build(src, ALL_ERRORS)
+    out = tmp_path / "out"
+    rc = safe_main([src, "--out", str(out), "--lisp", "--formats", "xlsx"])
+    assert rc == 0
+    s = (out / "d_summary.txt").read_text().splitlines()
+    kv = dict(l.split("=", 1) for l in s if "=" in l and not l.startswith(("R\t", "F\t")))
+    assert int(kv["errors"]) > 0 and kv["unchanged"] == "True" and int(kv["marks"]) >= 20
+    assert any(l.startswith("F\t") for l in s) and not (out / "d_summary.tmp").exists()
+    rows = [l.split("\t") for l in (out / "d_marks.tsv").read_text().splitlines()]
+    assert all(len(r) == 9 and r[2] in ("CIRCLE", "ELLIPSE_X", "ELLIPSE_Y") for r in rows)
+    float(rows[0][3]); float(rows[0][4])
+
+def test_cli_failure_writes_error_file(tmp_path):
+    from structcheck.cli import safe_main
+    out = tmp_path / "o"
+    rc = safe_main([str(tmp_path / "missing.dxf"), "--out", str(out), "--lisp"])
+    assert rc == 1 and (out / "structcheck_error.txt").exists()

@@ -70,15 +70,9 @@ def _marks(f, doc, unit_mm):
     return [one]
 
 
-def mark_dxf(src: str, findings, out: str, unit_mm: float = 1.0, severities=MARKABLE):
-    """Write a COPY of src with red/orange/amber circles. Returns (marked, skipped_ids)."""
-    if os.path.abspath(src) == os.path.abspath(out):
-        raise ValueError("Refusing to overwrite the source drawing; choose a different output file.")
-    doc = ezdxf.readfile(src)
-    if REVIEW_LAYER not in doc.layers:
-        doc.layers.add(REVIEW_LAYER, color=1)
-    msp = doc.modelspace()
-    marked, skipped = 0, []
+def collect_marks(doc, findings, unit_mm: float = 1.0, severities=MARKABLE):
+    """List of mark dicts (drawing units) + ids of findings that have no reliable location."""
+    marks, skipped = [], []
     for f in findings:
         sev = f.severity.value
         if sev not in severities:
@@ -88,20 +82,47 @@ def mark_dxf(src: str, findings, out: str, unit_mm: float = 1.0, severities=MARK
             skipped.append(f.id)
             continue
         for cx, cy, a, b in shapes:
-            attr = {"layer": REVIEW_LAYER, "color": ACI[sev], "lineweight": 50}
-            if abs(a - b) < 1e-6:
-                msp.add_circle((cx, cy), a, dxfattribs=attr)
-                msp.add_circle((cx, cy), a * 1.04, dxfattribs=attr)           # double ring: easy to see when zoomed out
-            else:
-                major = (a, 0, 0) if a >= b else (0, b, 0)
-                ratio = (b / a) if a >= b else (a / b)
-                msp.add_ellipse((cx, cy), major_axis=major, ratio=max(min(ratio, 1.0), 0.01), dxfattribs=attr)
             th = min(320.0 / unit_mm, max(min(a, b) * 0.5, 120.0 / unit_mm))
-            t = msp.add_text(f.id, height=th, dxfattribs={"layer": REVIEW_LAYER, "color": ACI[sev]})
-            t.set_placement((cx + max(a, b) * 1.08, cy + max(a, b) * 0.4))
-            marked += 1
+            marks.append({"id": f.id, "severity": sev, "cx": cx, "cy": cy, "a": a, "b": b, "height": th,
+                          "desc": f.description.replace("\t", " ").replace("\n", " ")})
+    return marks, skipped
+
+
+def mark_dxf(src: str, findings, out: str, unit_mm: float = 1.0, severities=MARKABLE):
+    """Write a COPY of src with red/orange/amber circles. Returns (marked, skipped_ids)."""
+    if os.path.abspath(src) == os.path.abspath(out):
+        raise ValueError("Refusing to overwrite the source drawing; choose a different output file.")
+    doc = ezdxf.readfile(src)
+    if REVIEW_LAYER not in doc.layers:
+        doc.layers.add(REVIEW_LAYER, color=1)
+    msp = doc.modelspace()
+    marks, skipped = collect_marks(doc, findings, unit_mm, severities)
+    for m in marks:
+        cx, cy, a, b, sev = m["cx"], m["cy"], m["a"], m["b"], m["severity"]
+        attr = {"layer": REVIEW_LAYER, "color": ACI[sev], "lineweight": 50}
+        if abs(a - b) < 1e-6:
+            msp.add_circle((cx, cy), a, dxfattribs=attr)
+            msp.add_circle((cx, cy), a * 1.04, dxfattribs=attr)           # double ring: easy to see when zoomed out
+        else:
+            major = (a, 0, 0) if a >= b else (0, b, 0)
+            ratio = (b / a) if a >= b else (a / b)
+            msp.add_ellipse((cx, cy), major_axis=major, ratio=max(min(ratio, 1.0), 0.01), dxfattribs=attr)
+        t = msp.add_text(m["id"], height=m["height"], dxfattribs={"layer": REVIEW_LAYER, "color": ACI[sev]})
+        t.set_placement((cx + max(a, b) * 1.08, cy + max(a, b) * 0.4))
     doc.saveas(out)
-    return marked, skipped
+    return len(marks), skipped
+
+
+def write_marks_tsv(src: str, findings, out_tsv: str, unit_mm: float = 1.0, severities=MARKABLE):
+    """Tab-separated marks for the AutoLISP add-on (it draws them straight into the open drawing)."""
+    doc = ezdxf.readfile(src)
+    marks, skipped = collect_marks(doc, findings, unit_mm, severities)
+    with open(out_tsv, "w", encoding="utf-8", newline="") as f:
+        for m in marks:
+            kind = "CIRCLE" if abs(m["a"] - m["b"]) < 1e-6 else ("ELLIPSE_X" if m["a"] > m["b"] else "ELLIPSE_Y")
+            f.write("\t".join([m["id"], m["severity"], kind, f"{m['cx']:.4f}", f"{m['cy']:.4f}", f"{m['a']:.4f}",
+                               f"{m['b']:.4f}", f"{m['height']:.4f}", m["desc"]]) + "\n")
+    return len(marks), skipped
 
 
 def mark_pdf(review_dxf: str, findings, out_pdf: str, unit_mm: float = 1.0, detail_pages: int = 40, severities=MARKABLE):

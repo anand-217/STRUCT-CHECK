@@ -3,6 +3,7 @@ import os, sys, threading, traceback
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
+from . import __version__
 from .engine import run_checks, DISCLAIMER
 from .profile import ProjectProfile
 from . import export
@@ -14,7 +15,7 @@ SEV_BG = {"ERROR": "#FDE2E0", "WARNING": "#FDE8D3", "REVIEW": "#FBF0CF", "NOT CH
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("StructCheck - structural drawing QC (offline)")
+        self.title(f"StructCheck v{__version__} - structural drawing QC (offline)")
         self.geometry("1280x760")
         self.configure(bg="white")
         self.result = None
@@ -49,7 +50,7 @@ class App(tk.Tk):
         self.run_btn = ttk.Button(row2, text="Run drawing checks", style="Accent.TButton", command=self.run)
         self.run_btn.pack(side="right")
         self.prog = ttk.Progressbar(self, mode="indeterminate"); self.prog.pack(fill="x", padx=12)
-        self.summary = tk.Label(self, text="Open a DXF to begin.", anchor="w", bg=GREY, padx=8, pady=6, justify="left")
+        self.summary = tk.Label(self, text=f"StructCheck v{__version__}  |  {self._capabilities()}\nOpen a DXF to begin.", anchor="w", bg=GREY, padx=8, pady=6, justify="left")
         self.summary.pack(fill="x", padx=12, pady=6)
         flt = tk.Frame(self, bg="white"); flt.pack(fill="x", padx=12)
         tk.Label(flt, text="Severity", bg="white").pack(side="left")
@@ -75,6 +76,15 @@ class App(tk.Tk):
         pan.add(self.tree, weight=3)
         self.detail = tk.Text(pan, height=10, wrap="word", bg=GREY, relief="flat", padx=8, pady=6); pan.add(self.detail, weight=1)
         tk.Label(self, text=DISCLAIMER, fg="#6B7280", bg="white", wraplength=1200, justify="left").pack(fill="x", padx=12, pady=(0, 8))
+
+    @staticmethod
+    def _capabilities():
+        def has(m):
+            try:
+                __import__(m); return "yes"
+            except Exception:
+                return "NO"
+        return f"slab-panel inference (shapely): {has('shapely')}   marked PDF (matplotlib): {has('matplotlib')}"
 
     def pick(self):
         p = filedialog.askopenfilename(title="Select DXF", filetypes=[("DXF drawing", "*.dxf")])
@@ -110,7 +120,7 @@ class App(tk.Tk):
     def done(self, res):
         self.prog.stop(); self.run_btn.state(["!disabled"]); self.result = res
         s = res.summary()
-        lines = [f"{res.drawing['filename']}  |  units: {res.drawing['unit_source']}  |  source unchanged: {res.integrity['unchanged']}",
+        lines = [f"v{__version__} | {self._capabilities()}", f"{res.drawing['filename']}  |  units: {res.drawing['unit_source']}  |  source unchanged: {res.integrity['unchanged']}",
                  f"Errors {s['errors']}   Warnings {s['warnings']}   Review {s['review']}   Not-checked items {s['not_checked_items']}   "
                  f"Rules completed {s['rules_completed']}/8, partial {s['rules_partial']}, skipped {s['rules_skipped']}"]
         lines.append("  ".join(f"R{r['rule']}:{r['status'][:4]}" for r in res.rules))

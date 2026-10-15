@@ -63,3 +63,7 @@ STRUCTCHECK_REVIEW: red = ERROR, orange = WARNING, amber = REVIEW, each tagged w
 (whole-sheet overview + one zoomed page per finding). In the app: "Marked DXF" / "Marked PDF" buttons.
 The original is never written; marking refuses to overwrite it. Findings without a reliable location are not circled
 (listed in the report). Findings in paper-space layouts are not circled yet.
+
+## Update (v0.5): AutoCAD add-on
+`autocad/StructCheck.lsp` adds SCHECK / SCHECKE / SCHECKCLEAR / SCHECKPDF / SCHECKFOLDER / SCHECKSETUP. The .exe now also runs
+in command-line mode (`StructCheck.exe drawing.dxf --out folder --lisp`), used by the add-on. See `docs/AUTOCAD_ADDON.md`.
