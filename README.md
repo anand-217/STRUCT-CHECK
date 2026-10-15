@@ -56,3 +56,10 @@ workflow (Actions tab); download the exe from the run's artifacts. The .exe has 
 ## Update (v0.2): real-drawing format
 Reads multi-line schedule headers, multi-beam rows ("2, 8, 19."), numeric tags on layers like `BEAM NO` / `COL-NO`,
 span-by-span MLINE beams, `%%U` codes. See `docs/LAYERS_AND_FORMAT.md`. 47 tests (incl. `tests/test_real_format.py`).
+
+## Update (v0.4): circles on the drawing
+`python -m structcheck drawing.dxf --out out --mark [--errors-only]` writes `<name>_REVIEW.dxf` (a COPY with circles on layer
+STRUCTCHECK_REVIEW: red = ERROR, orange = WARNING, amber = REVIEW, each tagged with its finding id) and `<name>_REVIEW.pdf`
+(whole-sheet overview + one zoomed page per finding). In the app: "Marked DXF" / "Marked PDF" buttons.
+The original is never written; marking refuses to overwrite it. Findings without a reliable location are not circled
+(listed in the report). Findings in paper-space layouts are not circled yet.
