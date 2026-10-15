@@ -22,6 +22,6 @@ If your layers are named differently, put a regex for them in the matching `*_la
 - Column schedules that list only some columns (here FC16, FC9) are compared only with plan labels of the same prefix.
 
 ## Known gaps on this format
-- Slab panels are not recognised (slab outlines are open polylines), so "panel without a number" is reported as NOT CHECKED.
+- Slab panels are inferred from the beam network (shapely); they need beams that close the panel, small gaps at columns are bridged (panel_close_gap_mm). Findings on inferred panels are REVIEW-level.
 - A label placed between two beams is reported as ambiguous (REVIEW), not guessed.
 - Hidden beams drawn as parallel lines are measured as such; confirm against your drawing convention.

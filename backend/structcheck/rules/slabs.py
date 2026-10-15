@@ -8,6 +8,58 @@ from ..geom import point_in_poly, poly_area, bbox_of, union_bbox
 from ..ids import strict_key, loose_key, match_key, is_blank
 
 
+class _Panel:
+    """Panel inferred from the beam network (no drawn outline)."""
+    def __init__(self, pts, layout, handles):
+        self.pts, self.layout, self.layer, self.closed = pts, layout, "(beam network)", True
+        self.handle = handles[0] if handles else ""
+        self.handles = handles
+
+
+def network_panels(ctx):
+    """Enclosed regions between beams = slab panels. Uses shapely (optional). Small gaps at columns are closed by
+    dilating the beam bands by profile.panel_close_gap_mm, then the result is shrunk back."""
+    try:
+        from shapely.geometry import LineString, Polygon
+        from shapely.ops import unary_union
+    except ImportError:
+        return None, "shapely is not installed"
+    from .beams import beam_geometry
+    geos = beam_geometry(ctx)
+    labels = ctx.beam_labels()
+    close = ctx.du(ctx.p.panel_close_gap_mm)
+    amin, amax = ctx.p.min_panel_area_m2 * 1e6, ctx.p.max_panel_area_m2 * 1e6
+    out = []
+    for lay in ctx.d.layouts:
+        gs = [g for g in geos if g.layout == lay]
+        if len(gs) < 3:
+            continue
+        lb = union_bbox([l.bbox for l in labels if l.layout == lay]) if labels else None
+        m = ctx.du(ctx.p.plan_margin_mm)
+        bands, hs = [], []
+        for g in gs:
+            cx, cy = (g.bbox[0] + g.bbox[2]) / 2, (g.bbox[1] + g.bbox[3]) / 2
+            if lb and not (lb[0] - m <= cx <= lb[2] + m and lb[1] - m <= cy <= lb[3] + m):
+                continue
+            for a, b in g.segs:
+                bands.append(LineString([a, b]).buffer(g.width_du / 2, cap_style=2))
+            hs += g.handles
+        if len(bands) < 3:
+            continue
+        U = unary_union(bands).buffer(close)
+        for pg in ([U] if U.geom_type == "Polygon" else list(U.geoms)):
+            for ring in pg.interiors:
+                hole = Polygon(ring).buffer(close)
+                a_mm2 = hole.area * ctx.unit ** 2
+                if hole.is_empty or not (amin <= a_mm2 <= amax):
+                    continue
+                if ctx.point_in_schedule(lay, (hole.centroid.x, hole.centroid.y)):
+                    continue
+                pts = [(x, y) for x, y in hole.exterior.coords][:-1]
+                out.append({"poly": _Panel(pts, lay, hs[:1]), "area": a_mm2, "bbox": bbox_of(pts)})
+    return out, ""
+
+
 def slab_panels(ctx):
     p, d = ctx.p, ctx.d
     pats = p.panel_layers
@@ -28,6 +80,13 @@ def slab_panels(ctx):
         if ctx.point_in_schedule(pl.layout, c):
             continue
         panels.append({"poly": pl, "area": area_mm2, "bbox": bbox_of(pl.pts)})
+    ctx._panel_source = "drawn outlines"
+    if not panels:
+        net, why = network_panels(ctx)
+        if net:
+            ctx._panel_source = "beam network"
+            return net, True            # inferred -> heuristic confidence
+        ctx._panel_why = why
     return panels, heuristic
 
 
@@ -103,9 +162,13 @@ def run(ctx) -> RuleResult:
         R.status = "PARTIAL"
         R.notes.append("No slab panel boundaries recognised; panel-level checks (C, D, E) not performed.")
         R.findings.append(ctx.not_checked(4, "Slab numbers", "Slab panels not checked",
-                                          "No closed polylines of plausible panel size were found. Panel-level checks need panel boundaries.",
+                                          "No closed slab outlines and no closed beam network of plausible panel size were found"
+                                          + (f" ({ctx._panel_why})" if getattr(ctx, "_panel_why", "") else "") + ".",
                                           "Set panel_layers in the profile or map panel boundaries manually."))
         return R
+    if getattr(ctx, "_panel_source", "") == "beam network":
+        R.notes.append("Slab panels were INFERRED from the beam network (no slab outlines drawn); panel findings are REVIEW-level. "
+                       f"{len(panels)} panels found.")
     sorted_p = sorted(panels, key=lambda pn: pn["area"])   # smallest first for nesting
     assigned = defaultdict(list)
     loose_labels = []
@@ -124,13 +187,13 @@ def run(ctx) -> RuleResult:
             R.findings.append(ctx.finding(
                 rule=4, category="Slab numbers", severity=Severity.WARNING if not heuristic else Severity.REVIEW, sub_check="C panel without label",
                 description="Slab panel without a slab number",
-                explanation=f"Closed boundary on layer {pl.layer}, area {pn['area'] / 1e6:.1f} m2 contains no slab label.",
+                explanation=f"Panel ({pl.layer}), area {pn['area'] / 1e6:.1f} m2 contains no slab label.",
                 layout=pl.layout, floor_level=ctx.floor_for(pl.layout), entity_handles=[pl.handle], bbox=pn["bbox"], confidence=base - 0.1,
                 reason="No slab annotation inside the panel" + (" (panel inferred from any closed polyline)" if heuristic else ""),
                 recommended_action="Add the slab number or confirm the polygon is not a slab panel."))
         elif len(labs) > 1 and not ctx.p.allow_multiple_slab_labels:
             R.findings.append(ctx.finding(
-                rule=4, category="Slab numbers", severity=Severity.WARNING, sub_check="D multiple labels",
+                rule=4, category="Slab numbers", severity=Severity.WARNING if not heuristic else Severity.REVIEW, sub_check="D multiple labels",
                 description=f"Panel contains {len(labs)} slab-number annotations ({', '.join(l.text for l in labs)})",
                 explanation="One slab number per panel expected by the profile.", identifier=", ".join(l.text for l in labs),
                 layout=pl.layout, entity_handles=[pl.handle] + [l.handle for l in labs], bbox=pn["bbox"], confidence=base,

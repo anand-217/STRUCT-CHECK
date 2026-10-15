@@ -52,3 +52,72 @@ def test_column_typo_hint(tmp_path):
     _, res = go(tmp_path, ["fc16"], [7])
     f = [x for x in res.findings if x.sub_check.startswith("G")][0]
     assert "FC16" in f.explanation
+
+
+def _network(path, label_right=True):
+    import ezdxf
+    from ezdxf import units
+    doc = ezdxf.new("R2018", setup=True); doc.units = units.MM
+    msp = doc.modelspace()
+    for a, b in (((0, 0), (8000, 0)), ((8000, 0), (8000, 4000)), ((8000, 4000), (0, 4000)), ((0, 4000), (0, 0)), ((4000, 0), (4000, 4000))):
+        msp.add_mline([a, b], dxfattribs={"layer": "BEAM", "scale_factor": 230, "style_name": "Standard"})
+    for x, n in ((2000, "S1"), (6000, "S2" if label_right else None)):
+        if n:
+            msp.add_text(n, height=200, dxfattribs={"insert": (x, 2000), "layer": "SLAB"})
+    for dx, t in ((0, "SLAB NOS."), (1500, "THK.")):
+        msp.add_text(t, height=200, dxfattribs={"insert": (20000 + dx, 0)})
+    msp.add_text("SCHEDULE OF SLAB AT FIRST SLAB LEVEL", height=300, dxfattribs={"insert": (20000, 800), "layer": "TXT"})
+    for i, (n, t) in enumerate((("S 1.", "100"), ("S 2.", "125")), start=1):
+        msp.add_text(n, height=200, dxfattribs={"insert": (20000, -600 * i)}); msp.add_text(t, height=200, dxfattribs={"insert": (21500, -600 * i)})
+    doc.saveas(path)
+
+
+def test_slab_panels_inferred_from_beam_network(tmp_path):
+    f = str(tmp_path / "n.dxf"); _network(f)
+    res = run_checks(f, ProjectProfile(), [4])
+    assert any("INFERRED" in n for n in res.rules[0]["notes"]) and "2 panels" in " ".join(res.rules[0]["notes"])
+    assert not [x for x in res.findings if x.severity in (Severity.ERROR, Severity.WARNING)]
+
+def test_inferred_panel_without_label_is_review_not_error(tmp_path):
+    f = str(tmp_path / "n2.dxf"); _network(f, label_right=False)
+    res = run_checks(f, ProjectProfile(), [4])
+    c = [x for x in res.findings if x.sub_check.startswith("C panel")]
+    assert c and all(x.severity == Severity.REVIEW for x in c)
+
+
+def test_marked_dxf_is_a_copy_with_circles(tmp_path):
+    import hashlib, ezdxf
+    from structcheck import review
+    src = str(tmp_path / "s.dxf")
+    from sample_factory import build, ALL_ERRORS
+    build(src, ALL_ERRORS)
+    before = hashlib.sha256(open(src, "rb").read()).hexdigest()
+    res = run_checks(src, ProjectProfile(column_id_mode="unique"))
+    out = str(tmp_path / "s_REVIEW.dxf")
+    n, skipped = review.mark_dxf(src, res.findings, out)
+    assert n >= 20 and hashlib.sha256(open(src, "rb").read()).hexdigest() == before
+    d = ezdxf.readfile(out)
+    kinds = [e.dxftype() for e in d.modelspace() if e.dxf.layer == review.REVIEW_LAYER]
+    assert kinds.count("CIRCLE") >= 20 and "TEXT" in kinds
+    src_layers = {e.dxf.layer for e in ezdxf.readfile(src).modelspace()}
+    assert review.REVIEW_LAYER not in src_layers          # original has no review layer
+
+def test_marking_refuses_to_overwrite_source(tmp_path):
+    import pytest
+    from structcheck import review
+    src = str(tmp_path / "s.dxf")
+    from sample_factory import build
+    build(src)
+    with pytest.raises(ValueError):
+        review.mark_dxf(src, [], src)
+
+def test_marked_pdf_written(tmp_path):
+    import pytest
+    pytest.importorskip("matplotlib")
+    from structcheck import review
+    from sample_factory import build, ALL_ERRORS
+    src = str(tmp_path / "s.dxf"); build(src, ALL_ERRORS)
+    res = run_checks(src, ProjectProfile(column_id_mode="unique"))
+    d = str(tmp_path / "m.dxf"); review.mark_dxf(src, res.findings, d)
+    pdf = str(tmp_path / "m.pdf"); n, _ = review.mark_pdf(d, res.findings, pdf, detail_pages=3)
+    assert n >= 20 and open(pdf, "rb").read(4) == b"%PDF"

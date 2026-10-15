@@ -58,6 +58,10 @@ class App(tk.Tk):
         ttk.Combobox(flt, textvariable=self.rule_filter, values=["All"] + [str(i) for i in range(1, 9)], width=5, state="readonly").pack(side="left", padx=4)
         for v in (self.sev_filter, self.rule_filter):
             v.trace_add("write", lambda *_: self.fill())
+        ttk.Button(flt, text="Marked PDF", style="Accent.TButton", command=lambda: self.mark("pdf")).pack(side="right", padx=3)
+        ttk.Button(flt, text="Marked DXF", style="Accent.TButton", command=lambda: self.mark("dxf")).pack(side="right", padx=3)
+        self.only_err = tk.BooleanVar(value=False)
+        tk.Checkbutton(flt, text="circle errors only", variable=self.only_err, bg="white").pack(side="right", padx=6)
         for label, fmt in (("Export Excel", "xlsx"), ("Export CSV", "csv"), ("Export JSON", "json")):
             ttk.Button(flt, text=label, command=lambda f=fmt: self.export(f)).pack(side="right", padx=3)
         pan = ttk.PanedWindow(self, orient="vertical"); pan.pack(fill="both", expand=True, padx=12, pady=6)
@@ -135,6 +139,37 @@ class App(tk.Tk):
                            f"Expected: {f.expected}   Detected: {f.detected}   Difference: {f.difference}\n"
                            f"Layout: {f.layout}   Schedule: {f.schedule_ref}\nEntity handles: {', '.join(f.entity_handles)}\n"
                            f"Location (minx,miny,maxx,maxy): {bb}\nReason: {f.reason}\nAction: {f.recommended_action}")
+
+    def mark(self, kind):
+        """Circles on the drawing: written to a NEW file; the original is never touched."""
+        if not self.result:
+            messagebox.showinfo("StructCheck", "Run the checks first."); return
+        from . import review
+        stem = os.path.splitext(os.path.basename(self.path.get()))[0]
+        out = filedialog.asksaveasfilename(defaultextension="." + kind, initialfile=f"{stem}_REVIEW.{kind}")
+        if not out:
+            return
+        if os.path.abspath(out) == os.path.abspath(self.path.get()):
+            messagebox.showerror("StructCheck", "Choose a different file name - the original drawing is never overwritten."); return
+        sev = ("ERROR",) if self.only_err.get() else review.MARKABLE
+        unit = self.result.drawing["unit_mm_per_drawing_unit"]
+        self.prog.start(12); self.summary.config(text="Writing marked " + kind.upper() + " (a PDF of a big drawing can take a minute)...")
+        def work():
+            try:
+                if kind == "dxf":
+                    n, sk = review.mark_dxf(self.path.get(), self.result.findings, out, unit, sev)
+                    msg = f"{n} circles written.\n{len(sk)} findings have no reliable location and are not circled.\n\n{out}"
+                else:
+                    import tempfile
+                    tmp = os.path.join(tempfile.mkdtemp(prefix="sc_"), "marked.dxf")
+                    review.mark_dxf(self.path.get(), self.result.findings, tmp, unit, sev)
+                    n, extra = review.mark_pdf(tmp, self.result.findings, out, unit, severities=sev)
+                    msg = f"PDF written with {n} marked findings (overview + zoom pages).\n\n{out}"
+                self.after(0, lambda: (self.prog.stop(), messagebox.showinfo("StructCheck", msg)))
+            except Exception as ex:
+                err = f"{type(ex).__name__}: {ex}"
+                self.after(0, lambda: (self.prog.stop(), messagebox.showerror("StructCheck", err)))
+        threading.Thread(target=work, daemon=True).start()
 
     def export(self, fmt):
         if not self.result:

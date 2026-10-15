@@ -108,7 +108,7 @@ class Drawing:
     dxf_version: str = ""
 
     def summary(self):
-        return {"filename": self.filename, "size_bytes": self.size_bytes, "sha256": self.sha256,
+        return {"source_path": self.path, "filename": self.filename, "size_bytes": self.size_bytes, "sha256": self.sha256,
                 "unit_mm_per_drawing_unit": self.unit_mm, "unit_source": self.unit_source,
                 "layouts": self.layouts, "layer_count": len(self.layers),
                 "entity_counts": self.entity_counts, "unsupported_entities": self.unsupported,

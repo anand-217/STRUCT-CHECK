@@ -82,6 +82,7 @@ class ProjectProfile:
     label_search_radius_mm: float = 600.0
     # --- Rule 4 slabs ---
     panel_layers: list = field(default_factory=list)
+    panel_close_gap_mm: float = 300.0        # beam gaps up to 2x this (e.g. at columns) are closed when inferring panels
     min_panel_area_m2: float = 1.5
     max_panel_area_m2: float = 150.0
     allow_multiple_slab_labels: bool = False
